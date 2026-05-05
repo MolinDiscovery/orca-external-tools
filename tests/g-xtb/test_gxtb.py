@@ -98,6 +98,18 @@ class GxtbV2Tests(unittest.TestCase):
             [0.0, 0.0, -3.6711581268357e-03, 0.0, 0.0, 3.6711581268357e-03],
         )
 
+    def test_reads_v2_energy_from_stdout_for_sp(self):
+        with tempfile.TemporaryDirectory() as td:
+            output = Path(td) / "mol_EXT.out"
+            output.write_text(
+                "electronic energy             -1.1630588661873E+00 Eh\n"
+                "total energy                  -1.1630588661873E+00 Eh\n"
+            )
+
+            energy = GxtbCalc.read_energy_from_output(output)
+
+        self.assertAlmostEqual(energy, -1.1630588661873)
+
     def test_live_h2_engrad_if_gxtb_exe_is_configured(self):
         gxtb_exe = os.getenv("GXTB_EXE")
         if not gxtb_exe:
@@ -127,6 +139,31 @@ class GxtbV2Tests(unittest.TestCase):
         self.assertEqual(num_atoms, 2)
         self.assertLess(energy, 0.0)
         self.assertEqual(len(gradients), 6)
+
+    def test_live_h2_sp_if_gxtb_exe_is_configured(self):
+        gxtb_exe = os.getenv("GXTB_EXE")
+        if not gxtb_exe:
+            self.skipTest("GXTB_EXE is not configured")
+        if not gxtb_script_path.exists():
+            self.skipTest("oet_gxtb script is not installed")
+
+        xyz_file, input_file, engrad_out, output_file = get_filenames("H2_live_sp")
+        write_xyz_file(xyz_file, OH)
+        write_input_file(
+            filename=input_file,
+            xyz_filename=xyz_file,
+            charge=0,
+            multiplicity=1,
+            ncores=1,
+            do_gradient=0,
+        )
+        run_gxtb(input_file, output_file, exe=gxtb_exe)
+
+        num_atoms, energy, gradients = read_result_file(engrad_out)
+
+        self.assertEqual(num_atoms, 2)
+        self.assertLess(energy, 0.0)
+        self.assertEqual(len(gradients), 0)
 
     def test_installed_entrypoints_help(self):
         if not gxtb_script_path.exists():
